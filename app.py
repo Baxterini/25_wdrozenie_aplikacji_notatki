@@ -12,6 +12,22 @@ from pydub.utils import which
 
 env = dotenv_values(".env")
 
+# Nadpisz wartości z secrets jeśli są dostępne (tylko na Streamlit Cloud)
+try:
+    if 'QDRANT_URL' in st.secrets:
+        env['QDRANT_URL'] = st.secrets['QDRANT_URL']
+    if 'QDRANT_API_KEY' in st.secrets:
+        env['QDRANT_API_KEY'] = st.secrets['QDRANT_API_KEY']
+except Exception as e:
+    st.info("💻 Tryb lokalny – `st.secrets` niedostępne")
+
+
+# 🔍 DEBUG – sprawdzenie, czy dane się wczytały
+st.write(f"🌐 URL: {env.get('QDRANT_URL')}")
+st.write(f"🔑 API KEY: {'✔️' if env.get('QDRANT_API_KEY') else '❌'}")
+
+
+
 EMBEDDING_MODEL = "text-embedding-3-large"
 EMBEDDING_DIM = 3072
 AUDIO_TRANSCRIBE_MODEL = "whisper-1"
@@ -38,27 +54,16 @@ def transcribe_audio(audio_bytes):
 def get_qdrant_client():
     """Tworzy połączenie z Qdrant z obsługą błędów"""
     try:
-        # DEBUG - sprawdź co jest w env
-        url = env.get("QDRANT_URL")
-        api_key = env.get("QDRANT_API_KEY")
+        # Użyj env.get() ale z fallback do hardkodowanych wartości
+        url = env.get("QDRANT_URL") 
+        api_key = env.get("QDRANT_API_KEY") 
         
-        st.write(f"🔍 DEBUG - URL found: {bool(url)}")
-        st.write(f"🔍 DEBUG - API key found: {bool(api_key)}")
-        st.write(f"🔍 DEBUG - env keys: {list(env.keys())}")
-        
-        # Sprawdź czy mamy dane
-        if not url or not api_key:
-            st.error("❌ Brak danych Qdrant w .env!")
-            st.write("Sprawdź czy plik .env zawiera:")
-            st.code("QDRANT_URL=https://...\nQDRANT_API_KEY=...")
-            return None
-       
         st.info(f"🔗 Łączę z Qdrant...")
-       
+        
         client = QdrantClient(
             url=url,
             api_key=api_key,
-            timeout=15.0
+            timeout=15.0  # 15 sekund timeout
         )
         
         # Test połączenia
@@ -68,6 +73,7 @@ def get_qdrant_client():
         
     except Exception as e:
         st.error(f"❌ Błąd połączenia z Qdrant: {str(e)}")
+        st.info("💡 Spróbuj odświeżyć stronę lub wyczyścić cache")
         return None
 
 def assure_db_collection_exists():
